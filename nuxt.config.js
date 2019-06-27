@@ -1,3 +1,13 @@
+const routerBase = process.env.DEPLOY_ENV === 'GH_PAGES' ? {
+  router: {
+    base: '/budget-nuxt/budgets'
+  }
+} : {
+  router: {
+    base: '/budgets'
+  }
+}
+
 module.exports = {
   mode: 'spa',
   /*
@@ -37,9 +47,7 @@ module.exports = {
     },
     vendor: ['axios']
   },
-  router: {
-    base: '/budgets'
-  },
+  ...routerBase,
   env: {
     currencies: ['USD', 'EUR', 'GBP', 'RUB'],
     exchangeApiResource: 'https://api.ratesapi.io/api/latest'
