@@ -1,6 +1,6 @@
 # budget-nuxt
 
-> Nuxt.js project
+> [DEMO](https://alex-krava.github.io/budget-nuxt/)
 
 ## Build Setup
 
