@@ -1,7 +1,7 @@
 <template>
     <section>
       <div class="details__container">
-        <nuxt-link to="/budgets" class="details__close"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/><path d="M0 0h24v24H0z" fill="none"/></svg></nuxt-link>
+        <nuxt-link to="/" class="details__close"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/><path d="M0 0h24v24H0z" fill="none"/></svg></nuxt-link>
         <div class="warning" v-if="selectedBudget.remaining < 0">Limit exceeded on {{-selectedBudget.remaining}} {{selectedBudget.currency}}</div>
         <div class="details__card">
           <div class="details__name">
@@ -62,35 +62,57 @@
 
 <script>
 import { Decimal } from 'decimal.js';
+import { mapGetters, mapMutations, mapActions } from 'vuex';
 import AddTransaction from '~/components/AddTransaction';
 
 export default {
   components: {AddTransaction},
-  middleware: ['budget'],
-  computed: {
-    selectedBudget() {
-      const id = +this.$route.params.id;
-      const budgets = this.$store.getters['budget/budgets'];
-      let selectedBudget;
-      budgets.some((budget) => {
-        if(budget.id === id) {
-          selectedBudget = budget;
-        }
-      });
-      return selectedBudget;
+  async validate({ params, store, redirect }) {
+    await store.dispatch('budget/fetchBudgets')
+    store.commit('budget/setSelectedBudgetId', params.id);
+    let budgets = await store.getters['budget/budgets'];
+    const hasBudget = budgets.some((budget) => budget.id === +params.id);
+    if (!hasBudget) {
+      redirect('/');
     }
+    return true
+  },
+  computed: {
+    ...mapGetters({
+      selectedBudget: 'budget/selectedBudget',
+      selectedBudgetId: 'budget/selectedBudgetId',
+      exchangeData: 'exchange/data'
+    })
   },
   mounted() {
-    this.intervalFunction = setInterval(() => this.transactionProcessing(), 30000);
-  },
-  destroyed() {
-    clearInterval(this.intervalFunction);
+    this.timeOutFunction();
+    this.$store.subscribe((mutation) => {
+      if(mutation.type === 'budget/addTransaction' ||
+         mutation.type === 'budget/removeTransaction' ||
+         mutation.type === 'budget/updateBudgets') {
+          this.saveBudgets();
+      }
+    });
   },
   data: () => ({
     modalFormOpen: false,
-    intervalFunction() {  }
+    timeOutFunction() {
+      setTimeout(() => {
+        this.transactionProcessing();
+        this.timeOutFunction();
+      }, 30000)
+    }
   }),
   methods: {
+    ...mapMutations({
+      addTransactionStore: 'budget/addTransaction',
+      removeTransactionStore: 'budget/removeTransaction',
+      updateBudgetsStore: 'budget/updateBudgets'
+    }),
+    ...mapActions({
+      saveBudgets: 'budget/saveBudgets',
+      fetchExchangeData: 'exchange/fetchExchangeData'
+    }),
     openModal() {
       this.modalFormOpen = true;
     },
@@ -98,32 +120,29 @@ export default {
       this.modalFormOpen = false;
     },
     addTransaction(value) {
-      const id = +this.$route.params.id;
-      this.$store.commit('budget/addTransaction', {id: id, transaction: value});
-      this.$store.dispatch('budget/saveBudgets');
+      const id = this.selectedBudgetId;
+      this.addTransactionStore({id: id, transaction: value});
       this.transactionProcessing();
       this.closeModal();
     },
     removeTransaction(index) {
-      const id = +this.$route.params.id;
-      this.$store.commit('budget/removeTransaction', {id: id, index: index});
-      this.$store.dispatch('budget/saveBudgets');
+      const id = this.selectedBudgetId;
+      this.removeTransactionStore({id: id, index: index});
       this.transactionProcessing();
     },
     async transactionProcessing() {
       const transactionsList = this.selectedBudget.transactions;
       const baseRate = this.selectedBudget.currency;
       const transactionAmounts = [];
-      await this.$store.dispatch('exchange/fetchExchangeData', baseRate);
-      const exchangeData = this.$store.getters['exchange/data'];
+      await this.fetchExchangeData(baseRate);
+      const exchangeData = this.exchangeData;
       transactionsList.forEach((transaction) => {
         const rate = transaction.currency;
         const sum = this.conversion(transaction.amount, exchangeData.rates[rate]);
         transactionAmounts.push(sum);
       });
       const newData = this.transactionCounting(this.selectedBudget.limit, transactionAmounts);
-      this.$store.commit('budget/updateBudgets', {data: newData, id: +this.$route.params.id});
-      this.$store.dispatch('budget/saveBudgets');
+      this.updateBudgetsStore({data: newData, id: this.selectedBudgetId});
     },
     conversion(sum, rate) {
       const sumD = new Decimal(sum);

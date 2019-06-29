@@ -5,11 +5,11 @@
         <li class="budgets__item budgets__item_create">
           <span class="budgets__link" title="Add Budget" @click="openModal()">+</span>
         </li>
-        <li v-for="(budget, index) in budgets" :key="budget.id" class="budgets__item">
-          <a @click="openDetail(budget.id)" class="budgets__link">
+        <li async v-for="(budget, index) in budgets" :key="budget.id" class="budgets__item">
+          <nuxt-link :to="`/${budget.id}`" class="budgets__link">
             <span class="budgets__text">{{budget.name}}</span>
             <span class="budgets__text">Limit: {{budget.limit}}{{budget.currency}}</span>
-          </a>
+          </nuxt-link>
           <a @click="removeBudget(index)" class="budgets__remove">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/><path d="M0 0h24v24H0z" fill="none"/>
             </svg>
@@ -26,18 +26,15 @@
 </template>
 
 <script>
+    import { mapGetters, mapMutations, mapActions } from 'vuex';
     import CreateBudget from '~/components/CreateBudget';
 
     export default {
       components: {
         CreateBudget
       },
-      async fetch({store, error}) {
-        try {
-          await store.dispatch('budget/fetchBudgets')
-        } catch (e) {
-          error(e);
-        }
+      async fetch({store}) {
+        await store.dispatch('budget/fetchBudgets');
       },
       data: () => ({
         modalFormOpen: false,
@@ -55,11 +52,28 @@
         }
       }),
       computed: {
-        budgets() {
-          return this.$store.getters['budget/budgets']
-        }
+        ...mapGetters({
+          budgets: 'budget/budgets'
+        }),
+      },
+      mounted() {
+        this.$store.subscribe((mutation) => {
+          if(mutation.type === 'budget/setBudget' ||
+            mutation.type === 'budget/removeBudget' ||
+            mutation.type === 'budget/resetBudget') {
+            this.saveBudgets();
+          }
+        });
       },
       methods: {
+        ...mapMutations({
+          setBudget: 'budget/setBudget',
+          removeBudgetStore: 'budget/removeBudget',
+          resetBudgetStore: 'budget/resetBudget'
+        }),
+        ...mapActions({
+          saveBudgets: 'budget/saveBudgets'
+        }),
         createBudget(value) {
           const budget = JSON.parse(JSON.stringify(this.defaultBudget));
           const lastId = (this.budgets.length) ? this.budgets[this.budgets.length - 1].id : null;
@@ -69,8 +83,7 @@
           budget.currency = value.currency;
           budget.id = (this.budgets.length) ? lastId + 1 : 1;
 
-          this.$store.commit('budget/setBudget', budget);
-          this.$store.dispatch('budget/saveBudgets');
+          this.setBudget(budget);
           this.closeModal();
         },
         openModal() {
@@ -80,19 +93,14 @@
           this.modalFormOpen = false;
         },
         removeBudget(index) {
-          this.$store.commit('budget/removeBudget', index);
-          this.$store.dispatch('budget/saveBudgets');
+          this.removeBudgetStore(index);
         },
         resetBudget(index) {
           const budget = JSON.parse(JSON.stringify(this.defaultBudget));
           const budgets = JSON.parse(JSON.stringify(this.budgets));
           budget.id = budgets[index].id;
           budget.name = budgets[index].name;
-          this.$store.commit('budget/resetBudget', {index, budget});
-          this.$store.dispatch('budget/saveBudgets');
-        },
-        openDetail(id) {
-          this.$router.push(`/${id}`)
+          this.resetBudgetStore({index, budget});
         }
       }
     }
