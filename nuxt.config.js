@@ -1,3 +1,4 @@
+const webpack = require('webpack');
 const routerBase = process.env.DEPLOY_ENV === 'GH_PAGES' ? {
   router: {
     base: '/budget-nuxt/budgets'
@@ -45,7 +46,12 @@ module.exports = {
         })
       }
     },
-    vendor: ['axios']
+    vendor: ['axios'],
+    plugins: [
+      new webpack.ProvidePlugin({
+        '_': 'lodash'
+      })
+    ]
   },
   ...routerBase,
   env: {

@@ -1,5 +1,6 @@
 export const state = () => ({
-  budgets: []
+  budgets: [],
+  selectedBudgetId: 0
 })
 
 export const mutations = {
@@ -9,6 +10,9 @@ export const mutations = {
   setBudget(state, budget) {
     state.budgets.push(budget);
   },
+  setSelectedBudgetId(state, id) {
+    state.selectedBudgetId = +id;
+  },
   removeBudget(state, index) {
     state.budgets.splice(index, 1);
   },
@@ -16,34 +20,19 @@ export const mutations = {
     state.budgets[values.index] = values.budget;
   },
   addTransaction(state, values) {
-    state.budgets.some((budgetParam, index) => {
-      if (budgetParam.id === values.id) {
-        state.budgets[index].transactions.push(values.transaction);
-        return true;
-      }
-      return false;
-    });
+    const budget = _.find(state.budgets, {id: values.id});
+    budget.transactions.push(values.transaction);
   },
   removeTransaction(state, values) {
-    state.budgets.some((budgetParam, index) => {
-      if (budgetParam.id === values.id) {
-        state.budgets[index].transactions.splice(values.index, 1);
-        return true;
-      }
-      return false;
-    });
+    const budget = _.find(state.budgets, {id: values.id});
+    _.remove(budget.transactions, (item, index) => index === values.index);
   },
   updateBudgets(state, values) {
-    state.budgets.some((budgetParam, index) => {
-      if (budgetParam.id === values.id) {
-        state.budgets[index].remaining = values.data.remaining;
-        state.budgets[index].averageAmount = values.data.average;
-        state.budgets[index].maximumAmount = values.data.maximum;
-        state.budgets[index].minimumAmount = values.data.minimum;
-        return true;
-      }
-      return false;
-    });
+    const budget = _.find(state.budgets, {id: values.id});
+    budget.remaining = values.data.remaining;
+    budget.averageAmount = values.data.average;
+    budget.maximumAmount = values.data.maximum;
+    budget.minimumAmount = values.data.minimum;
   }
 }
 
@@ -68,5 +57,7 @@ export const actions = {
 }
 
 export const getters = {
-  budgets: state => state.budgets
+  budgets: state => state.budgets,
+  selectedBudget: (state) => _.find(state.budgets, {id: state.selectedBudgetId}),
+  selectedBudgetId: (state) => state.selectedBudgetId,
 }
